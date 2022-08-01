@@ -6,6 +6,7 @@
 //! `percent-encoding`, and is a work in progress.
 //!
 //! [rfc-7512]: https://tools.ietf.org/html/rfc7512
+use std::fmt;
 
 // use core::convert::TryFrom;
 // use core::convert::TryInto;
@@ -85,6 +86,12 @@ pub struct Version {
     pub minor: u8,
 }
 
+impl fmt::Display for Version {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(formatter, "{}.{}", self.major, self.minor)
+    }
+}
+
 macro_rules! generate {
     (($Attributes:ident, $delimiter:literal): $($attribute:ident($value:ty, $converter:tt) = $name:literal,)*) => {
 
@@ -143,6 +150,92 @@ generate! { (PathAttributes, ';'):
     // TODO: vendor attributes
 }
 
+impl fmt::Display for PathAttributes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let mut values = Vec::new();
+
+        if let Some(ref value) = self.library_description {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("library-description={}", encoded));
+        }
+
+        if let Some(ref value) = self.library_manufacturer {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("library-manufacturer={}", encoded));
+        }
+
+        if let Some(value) = self.library_version {
+            values.push(format!("library-version={}", value));
+        }
+
+        if let Some(ref value) = self.slot_description {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("slot-description={}", encoded));
+        }
+
+        if let Some(value) = self.slot_id {
+            values.push(format!("slot-id={}", value));
+        }
+
+        if let Some(ref value) = self.slot_manufacturer {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("slot-manufacturer={}", encoded));
+        }
+
+        if let Some(ref value) = self.token_manufacturer {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("manufacturer={}", encoded));
+        }
+
+        if let Some(ref value) = self.token_model {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("model={}", encoded));
+        }
+
+        if let Some(ref value) = self.token_label {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("token={}", encoded));
+        }
+
+        if let Some(ref value) = self.token_serial {
+            let encoded = value
+                .iter()
+                .map(|byte| percent_encoding::percent_encode_byte(*byte))
+                .collect::<String>();
+            values.push(format!("serial={}", encoded));
+        }
+
+        if let Some(value) = self.object_class {
+            values.push(format!("type={}", value));
+        }
+
+        if let Some(ref value) = self.object_id {
+            let encoded = value
+                .iter()
+                .map(|byte| percent_encoding::percent_encode_byte(*byte))
+                .collect::<String>();
+            values.push(format!("id={}", encoded));
+        }
+
+        if let Some(ref value) = self.object_label {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("object={}", encoded));
+        }
+
+        let attributes = values.join(";");
+
+        formatter.write_str(&attributes)
+    }
+}
+
 #[repr(u32)]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum ObjectClass {
@@ -155,17 +248,35 @@ pub enum ObjectClass {
 }
 
 impl<'a> TryFrom<&'a str> for ObjectClass {
-    type Error = &'a str;
-    fn try_from(s: &'a str) -> std::result::Result<Self, Self::Error> {
+    type Error = String;
+
+    fn try_from(value: &'a str) -> std::result::Result<Self, Self::Error> {
         use ObjectClass::*;
-        Ok(match s {
-            "cert" => Certificate,
-            "data" => Data,
-            "private" => PrivateKey,
-            "public" => PublicKey,
-            "secret-key" => SecretKey,
-            _ => return Err(s),
-        })
+
+        match value {
+            "cert" => Ok(Certificate),
+            "data" => Ok(Data),
+            "private" => Ok(PrivateKey),
+            "public" => Ok(PublicKey),
+            "secret-key" => Ok(SecretKey),
+            _ => Err(format!("unsupported object class: {}", value)),
+        }
+    }
+}
+
+impl fmt::Display for ObjectClass {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        use ObjectClass::*;
+
+        let value = match self {
+            Certificate => "cert",
+            Data => "data",
+            PrivateKey => "private",
+            PublicKey => "public",
+            SecretKey => "secret-key",
+        };
+
+        formatter.write_str(value)
     }
 }
 
@@ -185,6 +296,40 @@ generate! { (QueryAttributes, '&'):
     module_path(String, percent_decode_string) = "module-path",
 
     // TODO: vendor attributes
+}
+
+impl fmt::Display for QueryAttributes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        let mut values = Vec::new();
+
+        if let Some(ref value) = self.pin_source {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("pin-source={}", encoded));
+        }
+
+        if let Some(ref value) = self.pin_value {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("pin-value={}", encoded));
+        }
+
+        if let Some(ref value) = self.module_name {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("module-name={}", encoded));
+        }
+
+        if let Some(ref value) = self.module_path {
+            let encoded =
+                percent_encoding::utf8_percent_encode(value, percent_encoding::NON_ALPHANUMERIC);
+            values.push(format!("module-path={}", encoded));
+        }
+
+        let attributes = values.join("&");
+
+        formatter.write_str(&attributes)
+    }
 }
 
 /// Parsed [RFC 7512](https://tools.ietf.org/html/rfc7512) PKCS #11 URI
@@ -441,5 +586,15 @@ impl Pkcs11Uri {
 
         let object = objects[0];
         Ok((ctx, session, object))
+    }
+}
+
+impl fmt::Display for Pkcs11Uri {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(
+            formatter,
+            "pkcs11:{}?{}",
+            self.path_attributes, self.query_attributes
+        )
     }
 }
